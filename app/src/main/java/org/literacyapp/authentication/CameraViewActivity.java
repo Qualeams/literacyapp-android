@@ -13,8 +13,13 @@ import android.view.WindowManager;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import org.literacyapp.LiteracyApplication;
 import org.literacyapp.MainActivity;
 import org.literacyapp.R;
+import org.literacyapp.dao.DaoSession;
+import org.literacyapp.dao.StudentImage;
+import org.literacyapp.dao.StudentImageCollectionEvent;
+import org.literacyapp.dao.StudentImageCollectionEventDao;
 import org.literacyapp.util.DeviceInfoHelper;
 import org.literacyapp.util.MultimediaHelper;
 import org.opencv.android.CameraBridgeViewBase;
@@ -33,6 +38,7 @@ import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -42,6 +48,8 @@ import ch.zhaw.facerecognitionlibrary.Helpers.MatOperation;
 import ch.zhaw.facerecognitionlibrary.PreProcessor.BrightnessCorrection.GammaCorrection;
 import ch.zhaw.facerecognitionlibrary.PreProcessor.PreProcessor;
 import ch.zhaw.facerecognitionlibrary.PreProcessor.PreProcessorFactory;
+import de.greenrobot.dao.internal.DaoConfig;
+import de.greenrobot.dao.query.CountQuery;
 
 public class CameraViewActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private JavaCameraView preview;
@@ -53,9 +61,12 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
     private int count;
     private String deviceId;
     private String collectionEventId;
+    private StudentImageCollectionEvent studentImageCollectionEvent;
+    private StudentImageCollectionEventDao studentImageCollectionEventDao;
     private Mat imgOverlay;
     private Mat imgMask;
     private Mat imgInvMask;
+
 
     static {
         if (!OpenCVLoader.initDebug()) {
@@ -68,6 +79,7 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
         diagnoseMode = true;
         imgMask = new Mat();
         imgInvMask = new Mat();
+        count = 0;
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera_view);
@@ -86,7 +98,13 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
 
         deviceId = DeviceInfoHelper.getDeviceId(getApplicationContext());
         // Calculate random CollectionEventId until the DB is not setup
-        collectionEventId = String.valueOf((int) (Math.random() * 1000000));
+
+        LiteracyApplication literacyApplication = (LiteracyApplication) getApplicationContext();
+        studentImageCollectionEventDao = literacyApplication.getDaoSession().getStudentImageCollectionEventDao();
+
+        collectionEventId = deviceId + String.format("%016d",studentImageCollectionEventDao.count() + 1);
+
+      //  studentImageCollectionEvent = new StudentImageCollectionEvent(collectionEventId);
     }
 
     @Override
@@ -121,11 +139,7 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
                     faces = MatOperation.rotateFaces(imgRgba, faces, ppF.getAngleForRecognition());
 
                     // Name = DeviceId_CollectionEventId_ImageNumber
-                    MatName matName = new MatName(deviceId + "_" + collectionEventId + "_" + count, img);
-                    FileHelper fh = new FileHelper();
-                    String wholeFolderPath = MultimediaHelper.getStudentImageDirectory() + "/" + deviceId + "/" + collectionEventId;
-                    new File(wholeFolderPath).mkdirs();
-                    fh.saveMatToImage(matName, wholeFolderPath + "/");
+                    storeStudentImage(img);
 
                     if(diagnoseMode) {
                         MatOperation.drawRectangleAndLabelOnPreview(imgRgba, faces[0], "Face detected", true);
@@ -172,6 +186,36 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
 
         ppF = new PreProcessorFactory(getApplicationContext());
         preview.enableView();
+    }
+
+    private void cacheStudentImage(Mat img){
+
+        String sId = deviceId + collectionEventId + count;
+
+        MatName matName = new MatName(sId, img);
+        FileHelper fh = new FileHelper();
+        String wholeFolderPath = MultimediaHelper.getStudentImageDirectory() + "/" + deviceId + "/" + collectionEventId;
+        new File(wholeFolderPath).mkdirs();
+        fh.saveMatToImage(matName, wholeFolderPath + "/");
+
+        Long Id =  Long.parseLong(String.valueOf((int) (Math.random() * 1000000)));
+        StudentImage studentImage = new StudentImage(Id, null, wholeFolderPath, null, null);
+
+    }
+
+    private void storeStudentImage(Mat img){
+
+        String sId = collectionEventId + count;
+
+        MatName matName = new MatName(sId, img);
+        FileHelper fh = new FileHelper();
+        String wholeFolderPath = MultimediaHelper.getStudentImageDirectory() + "/" + deviceId + "/" + collectionEventId;
+        new File(wholeFolderPath).mkdirs();
+        fh.saveMatToImage(matName, wholeFolderPath + "/");
+
+        Long Id =  Long.parseLong(String.valueOf((int) (Math.random() * 1000000)));
+        StudentImage studentImage = new StudentImage(Id, null, wholeFolderPath, null, null);
+
     }
 
     private double getBrightness(Mat img)
