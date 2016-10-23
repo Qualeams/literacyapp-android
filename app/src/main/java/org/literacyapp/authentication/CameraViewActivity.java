@@ -104,7 +104,7 @@ public class CameraViewActivity extends AppCompatActivity implements CameraBridg
 
         collectionEventId = deviceId + String.format("%016d",studentImageCollectionEventDao.count() + 1);
 
-      //  studentImageCollectionEvent = new StudentImageCollectionEvent(collectionEventId);
+      //studentImageCollectionEvent = new StudentImageCollectionEvent(collectionEventId);
     }
 
     @Override
